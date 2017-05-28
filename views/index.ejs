@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Multi</title>
+	<link rel='stylesheet' href='css/style.css' />
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+	<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+	<script type="text/javascript">
+$(document).ready(function(){
+
+			//instantiate socket
+			var socket = io.connect();
+
+			//receive users player number and ID
+			socket.on('player_id',function(data){
+				// note to player to that "spacebar" = "ready up";
+				alert('press spacebar when ready, once 4 players are ready the game will begin!');
+				currentPlayer = data.currentPlayer;
+				currentPlayerId = data.currentPlayerId;
+			});
+
+			
+
+
+			//recieves enemy location from server
+			socket.on('enemy_update', function(data){
+				enemies = data.enemies;
+				loadEnemies();
+			});
+
+			//console countdown timer after all players are ready
+			socket.on('get_ready_to_play',function(){
+				var countDown = 4;
+				var countDownArea = document.querySelector('#countdown')
+				var countDownTimer = setInterval(function(){
+					if(countDown > 0){
+						countDownArea.innerHTML = "Starting in..."+countDown+" seconds";
+					} else if(countDown == 0){
+						countDownArea.innerHTML = "GO";
+					}
+					else if(countDown == -1){
+						clearInterval(countDownTimer);
+						countDownArea.innerHTML = "";
+					}
+					countDown -= 1;
+				}, 1000);
+					
+			});
+
+			//update player movement if not equal to current player
+			socket.on('other_players_moved',function(data){
+				if(data.player !== currentPlayer){ 
+					//space = 32
+					if(data.movement == 37 && players[data.player].left > 0){
+						//left
+						players[data.player].left -= 10;
+						loadPlayers(data.player);
+					} else if (data.movement == 39 && players[data.player].left < 1170){
+						//right
+						players[data.player].left += 10;
+						loadPlayers(data.player);
+					} else if (data.movement == 38 && players[data.player].bottom < 600){
+						//up
+						players[data.player].bottom += 10;
+						loadPlayers(data.player);
+					} else if (data.movement == 40 && players[data.player].bottom > 0){
+						//down
+						players[data.player].bottom -= 10;
+						loadPlayers(data.player);
+					}
+				}
+			});
+
+			//Units Info
+			var players = {
+				player1 : {bottom: 200, left: 200, score: 0, id : ""},
+				player2 : {bottom: 200, left: 500, score: 0, id : ""},
+				player3 : {bottom: 200, left: 800, score: 0, id : ""},
+				player4 : {bottom: 200, left: 1100, score: 0, id : ""},
+			}
+			var enemies = [
+				{bottom: 550, left: 300, speed: 10},
+				{bottom: 550, left: 600, speed: 10},	
+				{bottom: 550, left: 900, speed: 10}
+			]
+
+			//collision detection
+			collisionDetector = function(){
+				for(var x in enemies){
+					for (var key in players) {
+					  	if(Math.abs(enemies[x].bottom - players[key].bottom) <= 120 && Math.abs(enemies[x].bottom - players[key].bottom) >= 60 && Math.abs(enemies[x].left - players[key].left) <= 60 && enemies[x].left - players[key].left >= 0){
+					  		socket.emit("reset_enemy",{enemyNumber: x});
+							players[key].score -= 1000;
+					  	}
+					}
+				}
+			};
+
+			//current player ID
+			var currentPlayer = "";
+			var currentPlayerId = "";
+
+			// load players original position into game
+			loadPlayers = function(player){
+				//original postion
+				if(!player){
+					//player 1
+					document.getElementById('player1').style['bottom'] = players.player1.bottom + "px";
+					document.getElementById('player1').style['left'] = players.player1.left + "px";
+					//player 2
+					document.getElementById('player2').style['bottom'] = players.player2.bottom + "px";
+					document.getElementById('player2').style['left'] = players.player2.left + "px";
+					//player 3
+					document.getElementById('player3').style['bottom'] = players.player3.bottom + "px";
+					document.getElementById('player3').style['left'] = players.player3.left + "px";
+					//player 4
+					document.getElementById('player4').style['bottom'] = players.player4.bottom + "px";
+					document.getElementById('player4').style['left'] = players.player4.left + "px";
+				} else{
+					document.getElementById(player).style['bottom'] = players[player].bottom + "px";
+					document.getElementById(player).style['left'] = players[player].left + "px";
+				}
+				
+			};
+
+
+			//load enemies
+			loadEnemies = function(){
+				var enemyOutput = "";
+				for(var x in enemies){
+					enemyOutput += '<div class="enemy" style="bottom:'+enemies[x].bottom+'px; left:'+enemies[x].left+'px" ><img src="/images/enemy.png"></div>'
+				}
+				document.getElementById('enemies').innerHTML = enemyOutput;
+			};
+
+			//update player movement and restrict to world size, report movement to server
+			document.onkeydown = function(a,player){
+				//space = 32
+				if(a.keyCode == 37 && players[currentPlayer].left > 0){
+					//left
+					players[currentPlayer].left -= 10;
+					loadPlayers(currentPlayer);
+					socket.emit("player_moved", {player: currentPlayer, direction: a.keyCode});
+				} else if (a.keyCode == 39 && players[currentPlayer].left < 1170){
+					//right
+					players[currentPlayer].left += 10;
+					loadPlayers(currentPlayer);
+					socket.emit("player_moved", {player: currentPlayer, direction: a.keyCode});
+				} else if (a.keyCode == 38 && players[currentPlayer].bottom < 600){
+					//up
+					players[currentPlayer].bottom += 10;
+					loadPlayers(currentPlayer);
+					socket.emit("player_moved", {player: currentPlayer, direction: a.keyCode});
+				} else if (a.keyCode == 40 && players[currentPlayer].bottom > 0){
+					//down
+					players[currentPlayer].bottom -= 10;
+					loadPlayers(currentPlayer);
+					socket.emit("player_moved", {player: currentPlayer, direction: a.keyCode});
+				} else if (a.keyCode == 32){
+					socket.emit("start_game")
+				}
+			};
+
+			//score load and incriment
+			loadScore = function(){
+				for (var key in players) {
+				  if (players.hasOwnProperty(key)) {
+				  	var playersScore = key + "_score";
+				    document.getElementById(playersScore).innerHTML = players[key].score += 5;
+				  }
+				}
+			};
+
+			//end game after amount of time, alert the player with the most points
+			determineWinner = function(){
+				var highScore = 0;
+				var winner = "";
+				setTimeout(function(){
+					for( var key in players){
+						if(players[key].score > highScore)
+						highScore = players[key].score;
+						winner = key;
+					}
+					alert(winner);
+					socket.emit("report_local_winner",{winner:winner,highScore:highScore});
+				}, 30000);
+			};
+
+			//initial game load
+			loadWorld = function(){
+				loadPlayers();
+				loadEnemies();
+			};
+
+			//game loop for updating score, enemies, etc...
+			gameLoop = function(func1,func2,func3){
+				setInterval(function(){
+					func1();
+					func2();
+					//func3();
+				}, 50);
+			};
+
+			//initial functions:
+			loadWorld();
+			socket.on('start_for_all',function(){
+				gameLoop(loadScore,collisionDetector);
+				determineWinner();
+			});
+
+			// report winner to all players
+			socket.on("final_winner",function(data){
+				alert("winner is "+data.winner+" with a score of "+data.highScore)
+			});
+		});
+	</script>
+</head>
+<body>
+	<div id="world">
+		<div id="players">
+			<div id="player1"><img src="/images/player_1.png"></div>
+			<div id="player2"><img src="/images/player_2.png"></div>
+			<div id="player3"><img src="/images/player_3.png"></div>
+			<div id="player4"><img src="/images/player_4.png"></div>
+		</div>
+		<div id="enemies">
+		</div>
+		
+	</div>
+	<div id="scoreBoard">
+		<div id="countdown">
+			
+		</div>
+		<div id="title">
+			<h2>Scores</h2>
+			<div>Player 1: <span id="player1_score">0</span></div>
+			<div>Player 2: <span id="player2_score">0</span></div>
+			<div>Player 3: <span id="player3_score">0</span></div>
+			<div>Player 4: <span id="player4_score">0</span></div>
+		</div>
+	</div>
+
+</body>
+</html>
+
+<!--
+--bullets
+--chat box
+-collision detector needs to update enemy posisiton on collision
+-add in powerups (score multipler, remove enemy, lower others score)
+-change background
+-->

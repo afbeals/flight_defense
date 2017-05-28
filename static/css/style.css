@@ -1,0 +1,35 @@
+#world{
+	background: url("/images/world.jpg") no-repeat;
+	width:1280px;
+	height:720px;
+	position: relative;
+	overflow:hidden;
+}
+#player1, #player2, #player3, #player4{
+	position:absolute;
+}
+#player1 img, #player2 img, #player3 img, #player4 img{
+	width:115px;
+	height:111px;
+}
+.enemy{
+	position:absolute;
+}
+.enemy img{
+	width:55px;
+	height:auto;
+	transform: rotate(180deg);
+}
+#scoreBoard{
+	position:relative;
+	display:block;
+	text-align: center;
+}
+#scoreBoard div{
+	display:inline-block;
+	margin: 0px 60px;
+    font-size: 25px;
+}
+#scoreBoard div span{
+	color: red;
+}
